@@ -16,7 +16,7 @@ exports.signup = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    const verificationToken = jwt.sign({ email }, "your-secret-key", { expiresIn: "1h" });
+    const verificationToken = jwt.sign({ email }, "your-secret-key", { expiresIn: process.env.JWT_EXPIRES_IN });
 
     user = new User({ name, email, password : hashedPassword , isVerified: false,verificationToken });
     await user.save();
@@ -113,7 +113,6 @@ exports.getUsers = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
 
 exports.deleteUser = async (req, res) => {
   try {
