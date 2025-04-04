@@ -98,7 +98,12 @@ exports.login = async (req, res) => {
       expiresIn: "1h", 
     });
 
-    res.status(200).json({ token, message: "User login successful" });
+   const userData = {
+      userId : user._id,
+      token:token,
+    }
+
+    res.status(200).json({ userData, message: "User login successful" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
@@ -113,6 +118,7 @@ exports.getUsers = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 exports.deleteUser = async (req, res) => {
   try {

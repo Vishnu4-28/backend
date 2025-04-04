@@ -1,18 +1,20 @@
 const Product = require("../models/Product");
+const User = require("../models/User");
+const Cart_Data = require("../models/Cart");
 const path = require('path')
 
 
 
 exports.addProduct = async (req, res) => {
   try {
-    const { product_name, price } = req.body;
+    const { product_name, price  } = req.body;
     
     if (!req.file) {
       return res.status(400).json({ error: "Image is required" });
     }
-
+      console.log("userId",req.body.user)
     const img = req.file.filename;
-    const newProduct = new Product({ product_name, price, img });
+    const newProduct = new Product({ product_name, price, img});
     const savedProduct = await newProduct.save();
 
     res.status(201).json({ message: "Product added successfully", product: savedProduct });
@@ -20,6 +22,92 @@ exports.addProduct = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+exports.getProducts = async (req, res) => {
+  try {
+    const products = await Product.find({});
+    res.status(200).json(products);
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.getUserProducts = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    console.log("userid--",userId);
+    const products = await Product.find({ user: userId });
+
+    res.status(200).json(products);
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+exports.addCart = async (req, res) => {
+  try {
+    const userId = req.user.userId; 
+    const { id } = req.params;
+    const {count} = req.body;
+    const product = await Product.findById(id);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    const newCart = new Cart_Data({
+      user: userId,
+      product_name: product.product_name,
+      price: product.price,
+      img: product.img,
+      count: count,
+      createdAt: product.createdAt,
+      updatedAt: product.updatedAt,
+    });
+      console.log("userr",newCart)
+    const savedCart = await newCart.save();
+
+    res.status(201).json({ message: "Product added to cart successfully", cartItem: savedCart });
+  } catch (err) {
+    console.error("Error adding to cart:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.getUserCart = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    console.log("userid--",userId);
+    const carts = await Cart_Data.find({ user: userId });
+
+    res.status(200).json(carts);
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+exports.deleteCartProduct = async (req,res) =>{
+  try{
+    const userId = req.user.userId;
+    const productId = req.params.id;
+    const Carts = await Cart_Data.find({ user: userId });
+    console.log("carts",Carts)
+    const deletedProduct  = await Cart_Data.findByIdAndDelete({ user : userId , _id : productId});
+    if (!deletedProduct) return res.status(404).json({ message: "Product not found in cart" });
+    res.status(200).json({ message: "Product deleted successfully" });
+   } catch (err) {
+     res.status(500).json({  error: err.message });
+   }
+}
+
+exports.viewCart = async (req,res) =>{
+  try {
+    const carts = await Cart_Data.find({});
+    res.status(200).json(carts);
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+}
 
 exports.updateProduct =  async (req,res) =>{
   console.log("img-->",req.body);
@@ -40,82 +128,6 @@ exports.updateProduct =  async (req,res) =>{
      res.status(500).json({ message: "server error"});
    }
  }
-
-// exports.updateProduct = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     let { product_name, price } = req.body;
-
-//     if (price) {
-//       price = Number(price);
-//       if (isNaN(price)) {
-//         return res.status(400).json({ error: "Invalid price format" });
-//       }
-//     }
-
-//     const updateData = { product_name, price };
-
-//     if (req.file) {
-//       updateData.img = req.file.filename;
-//     }
-
-//     const updatedProduct = await Product.findByIdAndUpdate(
-//       id,
-//       updateData,
-//       { new: true, runValidators: true }
-//     );
-
-//     if (!updatedProduct) {
-//       return res.status(404).json({ error: "Product not found" });
-//     }
-
-//     res.status(200).json({ message: "Product updated successfully", product: updatedProduct });
-
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// };
-
-
-
-//  exports.updateProduct = async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     const { product_name, price } = req.body;
-
-
-//     const product = await Product.findById(id);
-//     if (!product) {
-//       return res.status(404).json({ error: "Product not found" });
-//     }
-
-
-//     if (product_name) product.product_name = product_name;
-//     if (price) product.price = price;
-    
-
-//     if (req.file) {
-//       product.img = req.file.filename;
-//     }
-
-//     const updatedProduct = await product.save();
-//     res.status(200).json({ message: "Product updated successfully", product: updatedProduct });
-
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// };
-
-
-exports.getProducts = async (req, res) => {
-  try {
-    const products = await Product.find({});
-    res.status(200).json(products);
-  } catch (err) {
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
 
 exports.deleteProduct = async (req ,res) =>{
   console.log("res",req.params.id)
