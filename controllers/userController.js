@@ -3,7 +3,24 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const dotenv = require("dotenv");
 const sendEmail = require("../utils/sendEmail");
+const cookieParser = require("cookie-parser");
 dotenv.config();
+
+
+
+  const emailverification = async (data) =>{
+
+    const verificationLink = `http://localhost:5000/verify-email?token=${verificationToken}`;
+        const emailHtml = `
+            <h2>Welcome to Our App, ${data}!</h2>
+            <p>Please verify your email by clicking the link below:</p>
+            <a href="${verificationLink}">Verify Email</a>
+            <p>This link will expire in 1 hour.</p>
+        `;
+          console.log("EmailHtml",emailHtml);
+        await sendEmail(email, "Verify Your Email", emailHtml);
+
+    }
 
 
 
@@ -21,15 +38,7 @@ exports.signup = async (req, res) => {
     user = new User({ name, email, password : hashedPassword , isVerified: false,verificationToken });
     await user.save();
 
-    const verificationLink = `http://localhost:5000/verify-email?token=${verificationToken}`;
-        const emailHtml = `
-            <h2>Welcome to Our App, ${name}!</h2>
-            <p>Please verify your email by clicking the link below:</p>
-            <a href="${verificationLink}">Verify Email</a>
-            <p>This link will expire in 1 hour.</p>
-        `;
-          console.log("EmailHtml",emailHtml);
-        await sendEmail(email, "Verify Your Email", emailHtml);
+    emailverification(name);
 
     res.status(201).json({ message: "User registered successfully" });
   } catch (err) {
@@ -75,8 +84,8 @@ exports.login = async (req, res) => {
     const { email, password } = req.body;
 
   
-    let user = await User.findOne({ email }).select("+password");
-
+    let user = await User.findOne({ email });
+      console.log("user--->",user)
     if (!user) {
       return res.status(401).json({
         status: "failed",
@@ -85,9 +94,12 @@ exports.login = async (req, res) => {
     }
 
     if (!user.isVerified) {
-      return res.status(403).json({ message: "Please verify your email before logging in." });
-    }
+        
+      emailverification(email);
 
+      return res.status(403).json({ message: "Please verify your email before logging in." });
+      
+    }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
@@ -95,7 +107,15 @@ exports.login = async (req, res) => {
     }
 
     const token = jwt.sign({ userId: user._id }, "your-secret-key", {
-      expiresIn: "1h", 
+      expiresIn: process.env.JWT_EXPIRES_IN , 
+    });
+    
+    //cookie 
+    res.cookie("access_token", token, {
+      httpOnly: true, 
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Strict", 
+      maxAge: 7 * 24 * 60 * 60 * 1000, 
     });
 
    const userData = {

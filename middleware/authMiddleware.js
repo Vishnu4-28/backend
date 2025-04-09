@@ -2,9 +2,9 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User"); 
 
 const authMiddleware = async (req, res, next) => {
-  const token = req.header("Authorization");
+  // const token = req.header("Authorization");
   const userIdHeader = req.header("x-user-id"); 
-
+  const token = req.cookies.access_token;
   if (!token) {
     return res.status(401).json({ message: "Access denied. No token provided." });
   }

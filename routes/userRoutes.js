@@ -5,7 +5,7 @@ const authMiddleware  = require('../middleware/authMiddleware');
 
 router.post("/signup", signup);
 router.get("/verify-Email" ,verifyEmail);
-router.get("/login",login);
+router.post("/login",login);
 router.get("/getUser", getUsers);
 router.put("/updateUser/:id",authMiddleware, updateUser);
 router.delete("/delete/:id",authMiddleware, deleteUser);

@@ -3,7 +3,7 @@ const User = require("../models/User");
 const Cart_Data = require("../models/Cart");
 const path = require('path')
 
-
+const {uploadToCloudinary} = require('../config/multerConfig')
 
 exports.addProduct = async (req, res) => {
   try {
@@ -12,8 +12,15 @@ exports.addProduct = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: "Image is required" });
     }
+
+    const localFilePath = req.file.path;
+
+    const cloudinaryResult = await uploadToCloudinary(localFilePath, 'products');
+
+    const img = cloudinaryResult.secure_url;
+
       console.log("userId",req.body.user)
-    const img = req.file.filename;
+    // const img = req.file.filename;
     const newProduct = new Product({ product_name, price, img});
     const savedProduct = await newProduct.save();
 
@@ -22,6 +29,7 @@ exports.addProduct = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
 
 exports.getProducts = async (req, res) => {
   try {
@@ -54,37 +62,150 @@ exports.addCart = async (req, res) => {
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
+      const productToAdd = {
+        product_name: product.product_name,
+        price: product.price,
+        img: product.img,
+        count: count || 1,
+      }
 
-    const newCart = new Cart_Data({
-      user: userId,
-      product_name: product.product_name,
-      price: product.price,
-      img: product.img,
-      count: count,
-      createdAt: product.createdAt,
-      updatedAt: product.updatedAt,
-    });
-      console.log("userr",newCart)
-    const savedCart = await newCart.save();
+    let cart = await Cart_Data.findOne({ user: userId });
 
-    res.status(201).json({ message: "Product added to cart successfully", cartItem: savedCart });
+
+    if(!cart){
+      const newCart = new Cart_Data({
+        user: userId,
+        // product_name: product.product_name,
+        // price: product.price,
+        // img: product.img,
+        // count: count,
+        products: [productToAdd],
+        createdAt: product.createdAt,
+        updatedAt: product.updatedAt,
+      });
+    }else {
+      
+      const existingProductIndex = cart.products.findIndex(
+        (p) => p.product_name === product.product_name
+      );
+
+      if (existingProductIndex !== -1) {
+        cart.products[existingProductIndex].count += count || 1;
+      } else {
+
+        cart.products.push(productToAdd);
+      }
+    }
+
+ // const newCart = new Cart_Data({
+    //   user: userId,
+    //   // product_name: product.product_name,
+    //   // price: product.price,
+    //   // img: product.img,
+    //   // count: count,
+    //   products: [productToAdd],
+    //   createdAt: product.createdAt,
+    //   updatedAt: product.updatedAt,
+    // });
+      console.log("userr",cart)
+    const savedCart = await cart.save();
+
+    res.status(201).json({ message: "Product added to cart successfully",    cartItem: savedCart });
   } catch (err) {
     console.error("Error adding to cart:", err);
     res.status(500).json({ message: "Server error" });
   }
 };
 
+
 exports.getUserCart = async (req, res) => {
   try {
     const userId = req.user.userId;
-    console.log("userid--",userId);
+    console.log("userid--", userId);
+
     const carts = await Cart_Data.find({ user: userId });
 
-    res.status(200).json(carts);
+    let updatedCarts = [];
+    let grandTotal = 0;
+
+    for (let cart of carts) {
+      let productTotals = [];
+      let cartTotal = 0;
+
+      for (let product of cart.products) {
+        const totalAmount = product.price * product.count;
+        cartTotal += totalAmount;
+        productTotals.push({
+          ...product._doc, 
+          totalAmount,
+        });
+      }
+
+      grandTotal += cartTotal;
+
+      updatedCarts.push({
+        ...cart._doc,
+        products: productTotals,
+        cartTotal,
+      });
+    }
+
+    res.status(200).json({
+      carts: updatedCarts,
+      totalCartAmount: grandTotal,
+    });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Server error" });
   }
 };
+
+
+exports.removeCartProduct = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const productId = req.params.id;
+
+    const cart = await Cart_Data.findOne({ user: userId });
+    if (!cart) return res.status(404).json({ message: "Cart not found" });
+
+    let productFound = false;
+
+    const updatedProducts = cart.products
+      .map((product) => {
+        if (!product._id) return product;
+
+        if (product._id.toString() === productId) {
+          productFound = true;
+          if (product.count > 1) {
+            return {
+              ...product._doc,
+              count: product.count - 1,
+            };
+          } else {
+
+            return null;
+          }
+        }
+        return product;
+      })
+      .filter(Boolean);
+
+    if (!productFound) {
+      return res.status(404).json({ message: "Product not found in cart" });
+    }
+
+    cart.products = updatedProducts;
+    await cart.save();
+
+    res.status(200).json({ message: "Product updated in cart successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+
 
 exports.deleteCartProduct = async (req,res) =>{
   try{
